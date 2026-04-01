@@ -12,94 +12,75 @@ Updated Mermaid class diagram:
 
 ```mermaid
 classDiagram
+	class Task {
+		+description: str
+		+time: str
+		+frequency: str
+		+due_date: date
+		+is_completed: bool
+		+mark_complete()
+		+mark_incomplete()
+		+update_time(new_time: str)
+	}
+
+	class Pet {
+		+pet_id: str
+		+name: str
+		+species: str
+		+age: int
+		+tasks: List~Task~
+		+add_task(task: Task)
+		+remove_task(description: str) bool
+		+get_tasks() List~Task~
+	}
+
 	class Owner {
 		+owner_id: str
 		+name: str
 		+email: str
 		+timezone: str
-		+preferences: dict
+		+pets: List~Pet~
 		+add_pet(pet: Pet)
-		+update_preferences(preferences: dict)
-		+view_daily_tasks(date: str) list
+		+remove_pet(pet_id: str) bool
+		+get_pet(pet_id: str) Pet|None
+		+get_all_tasks() List~Task~
 	}
 
-	class Pet {
-		+pet_id: str
-		+owner_id: str
-		+name: str
-		+species: str
-		+age: int
-		+care_preferences: dict
-		+update_profile(data: dict)
-		+get_care_needs() dict
-	}
-
-	class CareTask {
-		+task_id: str
-		+pet_id: str
-		+task_type: str
-		+duration_minutes: int
-		+priority: int
-		+scheduled_time: str
-		+status: str
-		+set_priority(level: int)
-		+reschedule(new_time: str)
-		+mark_complete()
-	}
-
-	class Schedule {
-		+date: str
-		+tasks: list
-		+reasoning: list
-		+add_task(task: CareTask)
-		+get_ordered_tasks() list
-	}
-
-	class SchedulerEngine {
-		+constraints: dict
-		+generate_daily_plan(owner: Owner, pets: list, tasks: list) Schedule
-		+score_task(task: CareTask, constraints: dict) int
-		+explain_plan(schedule: Schedule) list
+	class Scheduler {
+		+get_all_tasks(owner: Owner) List~Task~
+		+sort_by_time(tasks: List~Task~) List~Task~
+		+organize_tasks(owner: Owner, include_completed: bool) List~Task~
+		+filter_tasks(owner: Owner, is_completed: bool|None, pet_name: str|None) List~Task~
+		+mark_task_complete(owner: Owner, pet_id: str, description: str) bool
+		+detect_time_conflicts(owner: Owner, include_completed: bool) List~str~
+		+get_pending_tasks(owner: Owner) List~Task~
+		+get_tasks_by_frequency(owner: Owner, frequency: str) List~Task~
+		+get_tasks_for_time(owner: Owner, time: str) List~Task~
 	}
 
 	Owner "1" --> "0..*" Pet : has
-	Pet "1" --> "0..*" CareTask : has
-	SchedulerEngine ..> CareTask : prioritizes
-	SchedulerEngine ..> Schedule : generates
-	Schedule "1" o-- "0..*" CareTask : contains
+	Pet "1" --> "0..*" Task : has
+	Scheduler ..> Owner : reads data
+	Scheduler ..> Pet : updates task completion
+	Scheduler ..> Task : sorts/filters/rolls recurring
 ```
 
 **a. Initial design**
 
-My initial UML design focused on the minimum set of classes needed to satisfy the project requirements while keeping responsibilities clear.
-
-Classes and responsibilities:
-
-- `Owner`: stores owner profile and preferences, and acts as the entry point for viewing daily tasks.
-- `Pet`: stores pet profile data and care preferences (species, age, and care needs).
-- `CareTask`: represents individual care items (walk, feed, meds, etc.) with duration, priority, schedule time, and completion status.
-- `Schedule`: holds the generated daily plan as an ordered list of tasks plus short reasoning notes.
-- `SchedulerEngine`: applies constraints and priorities to score tasks, produce a daily plan, and explain why tasks were ordered the way they were.
-
-This design separates data objects (`Pet`, `CareTask`, `Schedule`) from decision logic (`SchedulerEngine`) so scheduling behavior can evolve without changing the core data model.
+My initial design intentionally separated data from scheduling behavior. I started with an `Owner -> Pet -> Task` ownership chain and a scheduler service layer responsible for ordering and selecting tasks. The first UML was broader than the final code, but it helped define boundaries early: data classes should stay lightweight, while algorithmic logic belongs in one scheduler class.
 
 **b. Design changes**
 
-Yes, the design changed after AI-assisted review.
+The biggest change was simplifying the model to exactly what exists in code: `Task`, `Pet`, `Owner`, and `Scheduler`.
 
-What feedback identified:
+I removed abstract planning classes and put scheduling behavior into concrete methods:
 
-- Potential over-complexity: the earlier model included extra classes (for example reminders/logging) that were useful but not required for the module goals.
-- Potential logic bottleneck: too much scheduling behavior risked being split between `Schedule` and `SchedulerEngine`, which could cause duplicated conflict logic and harder debugging.
-- Relationship gap: the key ownership chain needed to stay explicit and central (`Owner -> Pet -> CareTask`) so task responsibility is always clear.
+- `sort_by_time()` for deterministic ordering
+- `filter_tasks()` for UI-driven views
+- `mark_task_complete()` for recurring rollover
+- `detect_time_conflicts()` for safety warnings
 
-What I changed and why:
-
-- I simplified to a requirement-aligned core: `Owner`, `Pet`, `CareTask`, `Schedule`, and `SchedulerEngine`.
-- I moved planning logic responsibility fully into `SchedulerEngine` and kept `Schedule` as a lightweight container for ordered tasks and reasoning.
-- I kept the essential relationships explicit in UML (`Owner has Pets`, `Pet has CareTasks`, `Schedule contains CareTasks`) to reduce ambiguity and support cleaner implementation.
-
-These updates made the model easier to implement and test, while still covering all required features (owner/pet input, task management, schedule generation, and plan explanation).
+This reduced abstraction overhead and made the architecture easier to test and explain.
 
 ---
 
@@ -107,17 +88,20 @@ These updates made the model easier to implement and test, while still covering 
 
 **a. Constraints and priorities**
 
-- What constraints does your scheduler consider (for example: time, priority, preferences)?
-- How did you decide which constraints mattered most?
+My scheduler currently uses these constraints:
+
+- Time ordering (`HH:MM`) to make the plan actionable.
+- Completion status to separate pending work from historical records.
+- Pet-specific filtering so multi-pet owners can focus quickly.
+- Recurrence rules (`daily`, `weekly`, `once`) to keep routines continuous.
+
+I prioritized constraints that directly reduce owner friction in daily usage: seeing what is next, knowing what is done, and not having to manually recreate recurring tasks.
 
 **b. Tradeoffs**
 
-- Describe one tradeoff your scheduler makes.
-- Why is that tradeoff reasonable for this scenario?
+My scheduler detects conflicts only for exact same-time matches (for example, two tasks at `18:30`). It does not yet detect overlap windows because the task model does not include durations.
 
-My scheduler currently detects conflicts only when two tasks share the exact same `HH:MM` time string. It does not detect partial overlaps because tasks do not yet include duration in the core scheduling algorithm.
-
-That tradeoff is reasonable for this scenario because it keeps conflict detection lightweight and easy to explain to a pet owner in a simple terminal/Streamlit workflow. It also avoids over-engineering while the app is still focused on core habits like consistency and recurring task completion.
+This is a deliberate simplification: it keeps conflict detection lightweight, predictable, and easy to communicate in the Streamlit UI while still providing practical safety alerts.
 
 ---
 
@@ -125,13 +109,29 @@ That tradeoff is reasonable for this scenario because it keeps conflict detectio
 
 **a. How you used AI**
 
-- How did you use AI tools during this project (for example: design brainstorming, debugging, refactoring)?
-- What kinds of prompts or questions were most helpful?
+I used Copilot in three modes:
+
+- Design support: refining the class boundaries and updating UML to match implementation.
+- Algorithm support: iterating on sort/filter/recurrence/conflict methods.
+- Verification support: generating targeted pytest cases and validating expected behavior.
+
+The most effective prompts were specific and testable, such as:
+
+- "How do I sort Task objects by `HH:MM` using a lambda key?"
+- "Use `timedelta` to compute next due date for daily/weekly recurrence."
+- "Suggest edge cases for conflict detection and no-task owners."
 
 **b. Judgment and verification**
 
-- Describe one moment where you did not accept an AI suggestion as-is.
-- How did you evaluate or verify what the AI suggested?
+I rejected a more compact conflict algorithm that was shorter but less readable for beginners. I kept a clearer grouped-loop approach instead.
+
+I verified the decision by:
+
+- Running `pytest` after each change.
+- Confirming warning outputs in both terminal and Streamlit UI.
+- Checking that readability remained high for future maintenance.
+
+Using separate chat sessions by phase helped me stay organized: one session for algorithm building, one for testing, and one for packaging/documentation. It reduced context drift and made each pass goal-driven.
 
 ---
 
@@ -139,13 +139,27 @@ That tradeoff is reasonable for this scenario because it keeps conflict detectio
 
 **a. What you tested**
 
-- What behaviors did you test?
-- Why were these tests important?
+I tested:
+
+- Task completion state changes.
+- Pet task list mutation on add.
+- Sorting correctness for out-of-order task times.
+- Daily recurrence creation after marking complete.
+- Conflict warning generation for duplicate times.
+- Empty-owner/empty-task edge cases.
+
+These tests protect the highest-value scheduler behaviors and prevent regressions in core planning logic.
 
 **b. Confidence**
 
-- How confident are you that your scheduler works correctly?
-- What edge cases would you test next if you had more time?
+Current confidence is **4/5** based on passing automated tests and manual Streamlit checks.
+
+If I had more time, I would add tests for:
+
+- Weekly recurrence with custom due dates.
+- Invalid time formats and how they appear in sorted views.
+- Duplicate task descriptions for the same pet and completion targeting.
+- Future support for duration overlaps instead of exact-time-only conflicts.
 
 ---
 
@@ -153,12 +167,12 @@ That tradeoff is reasonable for this scenario because it keeps conflict detectio
 
 **a. What went well**
 
-- What part of this project are you most satisfied with?
+I am most satisfied with the integration between backend logic and UI. The app now exposes smart behavior directly: filtered sorted schedules, recurring rollover, and actionable warnings.
 
 **b. What you would improve**
 
-- If you had another iteration, what would you improve or redesign?
+In a next iteration, I would redesign `mark_task_complete()` to use a task ID instead of description matching. That would remove ambiguity when multiple tasks share the same description.
 
 **c. Key takeaway**
 
-- What is one important thing you learned about designing systems or working with AI on this project?
+My key takeaway is that AI works best as a force multiplier when I stay the lead architect. The best results came from setting clear constraints, validating outputs with tests, and choosing readability over cleverness when maintaining a learning-focused codebase.

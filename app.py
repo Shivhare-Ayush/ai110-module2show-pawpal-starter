@@ -8,12 +8,10 @@ st.title("🐾 PawPal+")
 
 st.markdown(
     """
-Welcome to the PawPal+ starter app.
+Welcome to PawPal+, a smart pet care scheduler.
 
-This file is intentionally thin. It gives you a working Streamlit app so you can start quickly,
-but **it does not implement the project logic**. Your job is to design the system and build it.
-
-Use this app as your interactive demo once your backend classes/functions exist.
+Use this app to add pets and tasks, mark recurring tasks complete,
+review conflict warnings, and inspect a sorted/filtered schedule.
 """
 )
 
@@ -27,14 +25,14 @@ You will design and implement the scheduling logic and connect it to this Stream
 """
     )
 
-with st.expander("What you need to build", expanded=True):
+with st.expander("What this app demonstrates", expanded=True):
     st.markdown(
         """
-At minimum, your system should:
-- Represent pet care tasks (what needs to happen, how long it takes, priority)
-- Represent the pet and the owner (basic info and preferences)
-- Build a plan/schedule for a day that chooses and orders tasks based on constraints
-- Explain the plan (why each task was chosen and when it happens)
+This UI is connected to scheduler methods that provide:
+- Time-based sorting for task lists.
+- Task filtering by pet and completion status.
+- Recurring task rollover for daily/weekly tasks when marked complete.
+- Lightweight conflict warnings for same-time tasks.
 """
     )
 
@@ -136,15 +134,17 @@ if owner.pets and any(pet.tasks for pet in owner.pets):
     for pet in owner.pets:
         st.write(f"**{pet.name}**")
         if pet.tasks:
+            sorted_pet_tasks = scheduler.sort_by_time(pet.tasks)
             st.table(
                 [
                     {
+                        "due_date": task.due_date.isoformat(),
                         "description": task.description,
                         "time": task.time,
                         "frequency": task.frequency,
                         "completed": task.is_completed,
                     }
-                    for task in pet.tasks
+                    for task in sorted_pet_tasks
                 ]
             )
         else:
@@ -154,23 +154,87 @@ else:
 
 st.divider()
 
-st.subheader("Build Schedule")
-st.caption("This button calls your Scheduler to organize tasks by time.")
+st.subheader("Complete a Task")
+st.caption("Mark a pending task complete. Daily/weekly tasks auto-create the next occurrence.")
 
-if st.button("Generate schedule"):
-    schedule = scheduler.organize_tasks(owner)
-    if not schedule:
-        st.warning("No pending tasks found. Add tasks first.")
-    else:
-        st.markdown("### Today's Schedule")
-        st.table(
-            [
-                {
-                    "time": task.time,
-                    "description": task.description,
-                    "frequency": task.frequency,
-                    "status": "Done" if task.is_completed else "Pending",
-                }
-                for task in schedule
-            ]
+if owner.pets and any(pet.tasks for pet in owner.pets):
+    pending_options: dict[str, tuple[str, str]] = {}
+    for pet in owner.pets:
+        for task in pet.tasks:
+            if not task.is_completed:
+                label = (
+                    f"{pet.name} | {task.due_date.isoformat()} {task.time} | "
+                    f"{task.description} ({task.frequency})"
+                )
+                pending_options[label] = (pet.pet_id, task.description)
+
+    if pending_options:
+        selected_pending_label = st.selectbox(
+            "Pending tasks",
+            list(pending_options.keys()),
         )
+        if st.button("Mark selected task complete"):
+            selected_pet_id, selected_description = pending_options[selected_pending_label]
+            was_marked = scheduler.mark_task_complete(
+                owner,
+                pet_id=selected_pet_id,
+                description=selected_description,
+            )
+            if was_marked:
+                st.success("Task marked complete. Recurring tasks were rolled forward if needed.")
+            else:
+                st.warning("Task could not be marked complete.")
+    else:
+        st.info("No pending tasks available.")
+else:
+    st.info("Add pets and tasks first.")
+
+st.divider()
+
+st.subheader("Conflict Warnings")
+st.caption("Warnings are shown when multiple tasks share the same exact HH:MM time.")
+
+conflict_warnings = scheduler.detect_time_conflicts(owner)
+if conflict_warnings:
+    for warning in conflict_warnings:
+        st.warning(warning)
+else:
+    st.success("No same-time task conflicts found.")
+
+st.divider()
+
+st.subheader("Smart Schedule View")
+st.caption("Use filters below to view a sorted schedule for a pet, status, or both.")
+
+pet_filter_options = ["All Pets"] + [pet.name for pet in owner.pets]
+selected_pet_filter = st.selectbox("Filter by pet", pet_filter_options)
+status_filter = st.selectbox("Filter by status", ["All", "Pending", "Completed"])
+
+selected_pet_name = None if selected_pet_filter == "All Pets" else selected_pet_filter
+selected_status = None
+if status_filter == "Pending":
+    selected_status = False
+elif status_filter == "Completed":
+    selected_status = True
+
+filtered_schedule = scheduler.filter_tasks(
+    owner,
+    is_completed=selected_status,
+    pet_name=selected_pet_name,
+)
+
+if not filtered_schedule:
+    st.warning("No tasks match the selected filters.")
+else:
+    st.table(
+        [
+            {
+                "due_date": task.due_date.isoformat(),
+                "time": task.time,
+                "description": task.description,
+                "frequency": task.frequency,
+                "status": "Done" if task.is_completed else "Pending",
+            }
+            for task in filtered_schedule
+        ]
+    )

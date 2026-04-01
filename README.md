@@ -51,6 +51,19 @@ Recent scheduler improvements include:
 - Recurring task rollover: when a `daily` or `weekly` task is completed, a new pending task is auto-created for the next due date (`+1 day` or `+7 days`).
 - Lightweight conflict detection that returns warning messages when multiple tasks are scheduled for the same exact time.
 
+## Features
+
+- Multi-pet task management with owner profile context.
+- Chronological sorting for daily schedules.
+- Task filtering by pet name and completion status.
+- Recurring task generation for daily and weekly routines.
+- Non-blocking conflict warnings for exact same-time collisions.
+- Streamlit dashboard with task tables, completion actions, and warnings.
+
+## 📸 Demo
+
+<a href="image.png" target="_blank"><img src='image.png' title='PawPal App' width='' alt='PawPal App' class='center-block' /></a>
+
 ## Testing PawPal+
 
 Run the automated tests with:

@@ -2,6 +2,73 @@
 
 ## 1. System Design
 
+Core user actions the system should support:
+
+- A user can add and manage a pet profile, including key details like the pet's name, type, age, and care preferences.
+- A user can schedule a walk or care activity for a specific pet by choosing a date, time, and duration.
+- A user can view today's tasks in one place to quickly understand what care activities are due and what should be done next.
+
+Updated Mermaid class diagram:
+
+```mermaid
+classDiagram
+	class Owner {
+		+owner_id: str
+		+name: str
+		+email: str
+		+timezone: str
+		+preferences: dict
+		+add_pet(pet: Pet)
+		+update_preferences(preferences: dict)
+		+view_daily_tasks(date: str) list
+	}
+
+	class Pet {
+		+pet_id: str
+		+owner_id: str
+		+name: str
+		+species: str
+		+age: int
+		+care_preferences: dict
+		+update_profile(data: dict)
+		+get_care_needs() dict
+	}
+
+	class CareTask {
+		+task_id: str
+		+pet_id: str
+		+task_type: str
+		+duration_minutes: int
+		+priority: int
+		+scheduled_time: str
+		+status: str
+		+set_priority(level: int)
+		+reschedule(new_time: str)
+		+mark_complete()
+	}
+
+	class Schedule {
+		+date: str
+		+tasks: list
+		+reasoning: list
+		+add_task(task: CareTask)
+		+get_ordered_tasks() list
+	}
+
+	class SchedulerEngine {
+		+constraints: dict
+		+generate_daily_plan(owner: Owner, pets: list, tasks: list) Schedule
+		+score_task(task: CareTask, constraints: dict) int
+		+explain_plan(schedule: Schedule) list
+	}
+
+	Owner "1" --> "0..*" Pet : has
+	Pet "1" --> "0..*" CareTask : has
+	SchedulerEngine ..> CareTask : prioritizes
+	SchedulerEngine ..> Schedule : generates
+	Schedule "1" o-- "0..*" CareTask : contains
+```
+
 **a. Initial design**
 
 - Briefly describe your initial UML design.

@@ -71,13 +71,35 @@ classDiagram
 
 **a. Initial design**
 
-- Briefly describe your initial UML design.
-- What classes did you include, and what responsibilities did you assign to each?
+My initial UML design focused on the minimum set of classes needed to satisfy the project requirements while keeping responsibilities clear.
+
+Classes and responsibilities:
+
+- `Owner`: stores owner profile and preferences, and acts as the entry point for viewing daily tasks.
+- `Pet`: stores pet profile data and care preferences (species, age, and care needs).
+- `CareTask`: represents individual care items (walk, feed, meds, etc.) with duration, priority, schedule time, and completion status.
+- `Schedule`: holds the generated daily plan as an ordered list of tasks plus short reasoning notes.
+- `SchedulerEngine`: applies constraints and priorities to score tasks, produce a daily plan, and explain why tasks were ordered the way they were.
+
+This design separates data objects (`Pet`, `CareTask`, `Schedule`) from decision logic (`SchedulerEngine`) so scheduling behavior can evolve without changing the core data model.
 
 **b. Design changes**
 
-- Did your design change during implementation?
-- If yes, describe at least one change and why you made it.
+Yes, the design changed after AI-assisted review.
+
+What feedback identified:
+
+- Potential over-complexity: the earlier model included extra classes (for example reminders/logging) that were useful but not required for the module goals.
+- Potential logic bottleneck: too much scheduling behavior risked being split between `Schedule` and `SchedulerEngine`, which could cause duplicated conflict logic and harder debugging.
+- Relationship gap: the key ownership chain needed to stay explicit and central (`Owner -> Pet -> CareTask`) so task responsibility is always clear.
+
+What I changed and why:
+
+- I simplified to a requirement-aligned core: `Owner`, `Pet`, `CareTask`, `Schedule`, and `SchedulerEngine`.
+- I moved planning logic responsibility fully into `SchedulerEngine` and kept `Schedule` as a lightweight container for ordered tasks and reasoning.
+- I kept the essential relationships explicit in UML (`Owner has Pets`, `Pet has CareTasks`, `Schedule contains CareTasks`) to reduce ambiguity and support cleaner implementation.
+
+These updates made the model easier to implement and test, while still covering all required features (owner/pet input, task management, schedule generation, and plan explanation).
 
 ---
 

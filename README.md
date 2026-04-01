@@ -50,3 +50,21 @@ Recent scheduler improvements include:
 - Filtering tasks by completion status and pet name.
 - Recurring task rollover: when a `daily` or `weekly` task is completed, a new pending task is auto-created for the next due date (`+1 day` or `+7 days`).
 - Lightweight conflict detection that returns warning messages when multiple tasks are scheduled for the same exact time.
+
+## Testing PawPal+
+
+Run the automated tests with:
+
+```bash
+python -m pytest
+```
+
+Current tests cover:
+
+- Basic task and pet behavior (completion status and task creation).
+- Sorting correctness for out-of-order tasks.
+- Recurrence logic for daily task rollover after completion.
+- Conflict detection for duplicate scheduled times.
+- Edge cases such as a pet owner with no tasks.
+
+Confidence Level: ★★★★☆ (4/5)

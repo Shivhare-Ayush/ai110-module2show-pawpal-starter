@@ -71,3 +71,31 @@ def test_detect_time_conflicts_returns_warning_message() -> None:
     assert "18:30" in warnings[0]
     assert "Mochi: Evening walk" in warnings[0]
     assert "Luna: Medication" in warnings[0]
+
+
+def test_sort_by_time_returns_chronological_order() -> None:
+    scheduler = Scheduler()
+    tasks = [
+        Task(description="Evening walk", time="18:30", frequency="daily"),
+        Task(description="Breakfast", time="08:00", frequency="daily"),
+        Task(description="Morning walk", time="07:30", frequency="daily"),
+    ]
+
+    sorted_tasks = scheduler.sort_by_time(tasks)
+
+    assert [task.time for task in sorted_tasks] == ["07:30", "08:00", "18:30"]
+
+
+def test_owner_with_no_tasks_returns_empty_results() -> None:
+    owner = Owner(
+        owner_id="owner-1",
+        name="Jordan",
+        email="jordan@example.com",
+        timezone="America/Los_Angeles",
+    )
+    owner.add_pet(Pet(pet_id="pet-1", name="Mochi", species="dog", age=4))
+    scheduler = Scheduler()
+
+    assert scheduler.organize_tasks(owner) == []
+    assert scheduler.filter_tasks(owner, is_completed=False) == []
+    assert scheduler.detect_time_conflicts(owner) == []

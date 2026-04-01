@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
-from datetime import datetime
-from typing import Any, Dict, List
+from datetime import date, datetime, timedelta
+from typing import List
 
 
 @dataclass
@@ -8,6 +8,7 @@ class Task:
 	description: str
 	time: str
 	frequency: str
+	due_date: date = field(default_factory=date.today)
 	is_completed: bool = False
 
 	def mark_complete(self) -> None:
@@ -88,6 +89,10 @@ class Scheduler:
 		"""Return all tasks across every pet for the owner."""
 		return owner.get_all_tasks()
 
+	def sort_by_time(self, tasks: List[Task]) -> List[Task]:
+		"""Return tasks sorted by HH:MM time using a lambda key."""
+		return sorted(tasks, key=lambda task: self._task_sort_key(task))
+
 	def get_pending_tasks(self, owner: Owner) -> List[Task]:
 		"""Return all incomplete tasks across the owner's pets."""
 		return [task for task in owner.get_all_tasks() if not task.is_completed]
@@ -110,19 +115,79 @@ class Scheduler:
 		tasks = owner.get_all_tasks()
 		if not include_completed:
 			tasks = [task for task in tasks if not task.is_completed]
-		return sorted(tasks, key=self._task_sort_key)
+		return self.sort_by_time(tasks)
+
+	def filter_tasks(
+		self,
+		owner: Owner,
+		is_completed: bool | None = None,
+		pet_name: str | None = None,
+	) -> List[Task]:
+		"""Filter tasks by completion status and/or pet name, then sort by time."""
+		if pet_name is None:
+			tasks = owner.get_all_tasks()
+		else:
+			normalized_pet_name = pet_name.strip().lower()
+			tasks = []
+			for pet in owner.pets:
+				if pet.name.strip().lower() == normalized_pet_name:
+					tasks.extend(pet.get_tasks())
+
+		if is_completed is not None:
+			tasks = [task for task in tasks if task.is_completed == is_completed]
+
+		return self.sort_by_time(tasks)
 
 	def mark_task_complete(self, owner: Owner, pet_id: str, description: str) -> bool:
-		"""Mark a pet task complete by pet id and task description."""
+		"""Mark a pet task complete and create the next recurring instance when needed."""
 		pet = owner.get_pet(pet_id)
 		if pet is None:
 			return False
 
 		for task in pet.tasks:
-			if task.description == description:
+			if task.description == description and not task.is_completed:
 				task.mark_complete()
+				next_due_date = self._next_due_date(task)
+				if next_due_date is not None:
+					pet.add_task(
+						Task(
+							description=task.description,
+							time=task.time,
+							frequency=task.frequency,
+							due_date=next_due_date,
+						)
+					)
 				return True
 		return False
+
+	def detect_time_conflicts(self, owner: Owner, include_completed: bool = False) -> List[str]:
+		"""Return warning messages for tasks that share an exact HH:MM time."""
+		time_groups: dict[str, List[str]] = {}
+		for pet in owner.pets:
+			for task in pet.tasks:
+				if not include_completed and task.is_completed:
+					continue
+				task_label = f"{pet.name}: {task.description}"
+				time_groups.setdefault(task.time, []).append(task_label)
+
+		warnings: List[str] = []
+		for time_value, task_labels in sorted(time_groups.items(), key=lambda item: item[0]):
+			if len(task_labels) > 1:
+				warning = f"Warning: {len(task_labels)} tasks scheduled at {time_value} -> "
+				warning += "; ".join(task_labels)
+				warnings.append(warning)
+
+		return warnings
+
+	@staticmethod
+	def _next_due_date(task: Task) -> date | None:
+		"""Calculate the next due date for recurring tasks using timedelta."""
+		normalized_frequency = task.frequency.strip().lower()
+		if normalized_frequency == "daily":
+			return task.due_date + timedelta(days=1)
+		if normalized_frequency == "weekly":
+			return task.due_date + timedelta(days=7)
+		return None
 
 	@staticmethod
 	def _task_sort_key(task: Task) -> tuple[int, str]:

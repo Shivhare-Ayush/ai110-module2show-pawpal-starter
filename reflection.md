@@ -115,6 +115,10 @@ These updates made the model easier to implement and test, while still covering 
 - Describe one tradeoff your scheduler makes.
 - Why is that tradeoff reasonable for this scenario?
 
+My scheduler currently detects conflicts only when two tasks share the exact same `HH:MM` time string. It does not detect partial overlaps because tasks do not yet include duration in the core scheduling algorithm.
+
+That tradeoff is reasonable for this scenario because it keeps conflict detection lightweight and easy to explain to a pet owner in a simple terminal/Streamlit workflow. It also avoids over-engineering while the app is still focused on core habits like consistency and recurring task completion.
+
 ---
 
 ## 3. AI Collaboration
